@@ -1,8 +1,0 @@
-{"customer_id":101,"email":"alice@email.com","join_date":"2023-12-01","name":"Alice Johnson","segment":"Premium"}
-{"customer_id":102,"email":"bob@email.com","join_date":"2024-01-10","name":"Bob Smith","segment":"Regular"}
-{"customer_id":103,"email":"carol@email.com","join_date":"2023-11-15","name":"Carol White","segment":"Regular"}
-{"customer_id":104,"email":"david@email.com","join_date":"2024-02-20","name":"David Brown","segment":"Premium"}
-{"customer_id":105,"email":"emma@email.com","join_date":"2024-03-05","name":"Emma Davis","segment":"Regular"}
-{"customer_id":106,"email":"frank@email.com","join_date":"2024-05-01","name":"Frank Miller","segment":"Premium"}
-{"customer_id":107,"email":"grace@email.com","join_date":"2024-06-10","name":"Grace Lee","segment":"Regular"}
-{"customer_id":108,"email":"henry@email.com","join_date":"2024-07-15","name":"Henry Wilson","segment":"Premium"}
