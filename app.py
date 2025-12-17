@@ -48,12 +48,12 @@ def load_gold_dashboard() -> pd.DataFrame:
 
 def main() -> None:
     st.set_page_config(
-        page_title="E‑Commerce Revenue & Customer Segmentation",
+        page_title="Revenue & Customer Segmentation",
         layout="wide",
         initial_sidebar_state="expanded",
     )
 
-    st.title("📊 E‑Commerce Data Warehouse Dashboard")
+    st.title("📊 DW ETL Dashboard")
     st.markdown(
         "Interactive dashboard powered by the **Gold** layer of the PySpark ETL pipeline.\n"
         "Data is aggregated by month, customer segment, and RFM value segment."
