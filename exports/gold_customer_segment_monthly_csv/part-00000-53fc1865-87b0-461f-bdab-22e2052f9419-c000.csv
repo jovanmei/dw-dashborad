@@ -1,0 +1,11 @@
+order_year,order_month,customer_segment,value_segment,revenue,order_count,customer_count
+2024,1,Premium,low_value,150.0,1,1
+2024,1,Regular,low_value,320.5,1,1
+2024,2,Premium,low_value,89.99,1,1
+2024,3,Premium,low_value,450.75,1,1
+2024,4,Regular,low_value,199.99,1,1
+2024,5,Premium,low_value,299.99,1,1
+2024,5,Regular,low_value,180.0,1,1
+2024,6,Premium,low_value,919.99,2,2
+2024,7,Regular,low_value,375.5,2,2
+2024,8,Premium,low_value,675.0,1,1

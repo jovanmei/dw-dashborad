@@ -1,0 +1,11 @@
+# PySpark ETL Pipeline Dependencies
+# ===================================
+#
+# This project uses PySpark for distributed data processing.
+# Install with: pip install -r requirements.txt
+#
+# Note: PySpark requires Java 8 or later. Make sure JAVA_HOME is set correctly.
+
+pyspark>=3.5.0
+streamlit>=1.40.0
+pandas>=1.5.0
