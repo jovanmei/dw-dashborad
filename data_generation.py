@@ -212,13 +212,53 @@ def _generate_dirty_orders_data():
     orders_data.append((1, 101, "2024-01-15", "completed", 150.00, "legacy_db", "2024-01-15 10:30:00"))
     orders_data.append((5, 104, "2024-03-15", "completed", 450.75, "new_api", "2024-03-15 14:22:33"))
     
-    # Add some potentially fraudulent orders for demonstration
-    orders_data.append((200, 101, "2024-01-15", "completed", 2500.00, "web_portal", "2024-01-15 15:30:00"))  # Same day, high amount
-    orders_data.append((201, 102, "2024-06-01", "completed", 3200.00, "mobile_app", "2024-06-01 10:15:00"))  # High amount
-    orders_data.append((202, 103, "2024-07-10", "completed", 1800.00, "web_portal", "2024-07-10 09:45:00"))  # High amount
-    orders_data.append((203, 101, "2024-01-15", "completed", 1200.00, "mobile_app", "2024-01-15 18:22:00"))  # Same day as order 200
+    # Add clearly fraudulent orders for demonstration
+    orders_data.extend(_generate_fraudulent_orders())
     
     return orders_data
+
+
+def _generate_fraudulent_orders():
+    """
+    Generate obviously fraudulent orders for demonstration purposes.
+    
+    Fraud patterns included:
+    1. Multiple high-value orders from same customer on same day
+    2. Unusually high order amounts
+    3. Rapid succession of orders (velocity fraud)
+    4. Orders with suspicious timing patterns
+    """
+    fraud_orders = []
+    
+    # Pattern 1: Card testing - Multiple orders same day, same customer
+    fraud_orders.append((200, 101, "2024-01-15", "completed", 2500.00, "web_portal", "2024-01-15 15:30:00"))
+    fraud_orders.append((203, 101, "2024-01-15", "completed", 1200.00, "mobile_app", "2024-01-15 18:22:00"))
+    fraud_orders.append((204, 101, "2024-01-15", "completed", 3100.00, "web_portal", "2024-01-15 20:45:00"))
+    
+    # Pattern 2: High-value orders (potential stolen credit card)
+    fraud_orders.append((201, 102, "2024-06-01", "completed", 5200.00, "mobile_app", "2024-06-01 10:15:00"))
+    fraud_orders.append((205, 105, "2024-08-15", "completed", 4800.00, "web_portal", "2024-08-15 14:30:00"))
+    fraud_orders.append((206, 108, "2024-09-20", "completed", 6500.00, "mobile_app", "2024-09-20 09:15:00"))
+    
+    # Pattern 3: Velocity fraud - Multiple orders within hours
+    fraud_orders.append((207, 103, "2024-07-10", "completed", 1800.00, "web_portal", "2024-07-10 09:45:00"))
+    fraud_orders.append((208, 103, "2024-07-10", "completed", 2200.00, "mobile_app", "2024-07-10 11:30:00"))
+    fraud_orders.append((209, 103, "2024-07-10", "completed", 1950.00, "web_portal", "2024-07-10 14:15:00"))
+    
+    # Pattern 4: Account takeover - Sudden change in purchase behavior
+    fraud_orders.append((210, 106, "2024-10-05", "completed", 3800.00, "web_portal", "2024-10-05 02:30:00"))  # Unusual time
+    fraud_orders.append((211, 106, "2024-10-05", "completed", 4200.00, "mobile_app", "2024-10-05 03:15:00"))
+    
+    # Pattern 5: Bulk purchase fraud
+    fraud_orders.append((212, 110, "2024-11-12", "completed", 2900.00, "web_portal", "2024-11-12 16:45:00"))
+    fraud_orders.append((213, 112, "2024-11-20", "completed", 3300.00, "mobile_app", "2024-11-20 10:20:00"))
+    
+    # Pattern 6: International fraud (rapid orders from different locations)
+    fraud_orders.append((214, 115, "2024-12-01", "completed", 2100.00, "web_portal", "2024-12-01 08:00:00"))
+    fraud_orders.append((215, 115, "2024-12-01", "completed", 2400.00, "mobile_app", "2024-12-01 08:30:00"))
+    fraud_orders.append((216, 115, "2024-12-01", "completed", 1900.00, "web_portal", "2024-12-01 09:00:00"))
+    
+    return fraud_orders
 
 
 def _generate_dirty_customers_data():
@@ -477,13 +517,51 @@ def _generate_dirty_order_items_data():
     order_items_data.append((1, 1, 201, 2, 75.00, 15.0, 6.00, 81.00))
     order_items_data.append((5, 5, 204, 3, 150.25, 0.0, 12.02, 162.27))
     
-    # Add order items for potentially fraudulent orders
-    order_items_data.append((1000, 200, 201, 15, 150.00, 0.0, 180.00, 2430.00))  # High quantity
-    order_items_data.append((1001, 201, 202, 8, 400.00, 0.0, 256.00, 3456.00))   # High price
-    order_items_data.append((1002, 202, 203, 12, 150.00, 0.0, 144.00, 1944.00))  # High quantity
-    order_items_data.append((1003, 203, 204, 6, 200.00, 0.0, 96.00, 1296.00))    # Normal but contributes to same-day pattern
+    # Add order items for fraudulent orders with suspicious patterns
+    order_items_data.extend(_generate_fraudulent_order_items())
     
     return order_items_data
+
+
+def _generate_fraudulent_order_items():
+    """
+    Generate order items for fraudulent orders with suspicious quantity patterns.
+    """
+    fraud_items = []
+    item_id_start = 2000
+    
+    # Items for card testing orders (200, 203, 204) - Customer 101
+    fraud_items.append((item_id_start, 200, 201, 15, 150.00, 0.0, 180.00, 2430.00))      # High quantity electronics
+    fraud_items.append((item_id_start+1, 200, 205, 8, 75.00, 0.0, 48.00, 648.00))       # Multiple expensive items
+    
+    fraud_items.append((item_id_start+2, 203, 202, 6, 200.00, 0.0, 96.00, 1296.00))     # High-value items
+    
+    fraud_items.append((item_id_start+3, 204, 201, 20, 150.00, 0.0, 240.00, 3240.00))   # Bulk electronics purchase
+    
+    # Items for high-value orders (201, 205, 206)
+    fraud_items.append((item_id_start+4, 201, 201, 25, 200.00, 0.0, 400.00, 5400.00))   # Bulk expensive electronics
+    fraud_items.append((item_id_start+5, 205, 202, 18, 250.00, 0.0, 360.00, 4860.00))   # High quantity phones
+    fraud_items.append((item_id_start+6, 206, 203, 30, 200.00, 0.0, 480.00, 6480.00))   # Suspicious bulk headphones
+    
+    # Items for velocity fraud (207, 208, 209) - Customer 103
+    fraud_items.append((item_id_start+7, 207, 204, 12, 150.00, 0.0, 144.00, 1944.00))   # Coffee makers
+    fraud_items.append((item_id_start+8, 208, 201, 14, 150.00, 0.0, 168.00, 2268.00))   # More electronics
+    fraud_items.append((item_id_start+9, 209, 205, 16, 120.00, 0.0, 153.60, 2073.60))   # Shoes
+    
+    # Items for account takeover (210, 211) - Customer 106
+    fraud_items.append((item_id_start+10, 210, 202, 22, 170.00, 0.0, 299.20, 4039.20))  # Late night bulk purchase
+    fraud_items.append((item_id_start+11, 211, 201, 28, 150.00, 0.0, 336.00, 4536.00))  # Continued bulk purchase
+    
+    # Items for bulk purchase fraud (212, 213)
+    fraud_items.append((item_id_start+12, 212, 203, 35, 80.00, 0.0, 224.00, 3024.00))   # Bulk headphones
+    fraud_items.append((item_id_start+13, 213, 204, 25, 130.00, 0.0, 260.00, 3510.00))  # Bulk appliances
+    
+    # Items for international fraud (214, 215, 216) - Customer 115
+    fraud_items.append((item_id_start+14, 214, 205, 18, 115.00, 0.0, 165.60, 2235.60))  # Rapid purchase 1
+    fraud_items.append((item_id_start+15, 215, 201, 16, 150.00, 0.0, 192.00, 2592.00))  # Rapid purchase 2
+    fraud_items.append((item_id_start+16, 216, 202, 12, 155.00, 0.0, 148.80, 2008.80))  # Rapid purchase 3
+    
+    return fraud_items
 
 
 def _generate_dirty_products_data():

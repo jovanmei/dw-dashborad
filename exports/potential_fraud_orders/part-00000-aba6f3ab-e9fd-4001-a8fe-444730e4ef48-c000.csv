@@ -1,0 +1,55 @@
+order_id,customer_id,order_date_cleaned,total_amount_cleaned,total_quantity,max_item_quantity,fraud_score,fraud_type,risk_level,potential_fraud
+66,101,2023-12-26,1516.1,29,10,3,Bulk Purchase Fraud,Low,true
+200,101,2024-01-15,2500.0,23,15,9,Velocity + High Value,Critical,true
+203,101,2024-01-15,1200.0,6,6,5,Velocity Fraud,Medium,true
+204,101,2024-01-15,3100.0,20,20,10,Velocity + High Value,Critical,true
+82,102,2023-03-07,2182.39,16,9,3,Mixed Pattern,Low,true
+201,102,2024-06-01,5200.0,25,25,8,High Value Fraud,Critical,true
+208,103,2024-07-10,2200.0,14,14,7,Velocity + High Value,High,true
+209,103,2024-07-10,1950.0,16,16,8,Velocity Fraud,Critical,true
+18,104,2023-09-16,2855.63,17,8,3,Mixed Pattern,Low,true
+36,104,2024-01-27,2314.58,20,10,3,Mixed Pattern,Low,true
+5,104,2024-02-03,1563.47,21,9,3,Bulk Purchase Fraud,Low,true
+46,104,2024-09-28,2016.76,23,9,4,Bulk Purchase Fraud,Medium,true
+55,105,2023-10-04,1794.09,25,10,3,Bulk Purchase Fraud,Low,true
+3,105,2024-07-23,1844.81,25,8,3,Bulk Purchase Fraud,Low,true
+63,105,2024-07-23,521.51,26,8,6,Velocity Fraud,High,true
+205,105,2024-08-15,4800.0,18,18,6,High Value Fraud,High,true
+10,106,2023-11-10,1939.8,24,8,3,Bulk Purchase Fraud,Low,true
+210,106,2024-10-05,3800.0,22,22,7,High Value Fraud,High,true
+211,106,2024-10-05,4200.0,28,28,12,Velocity + High Value,Critical,true
+108,106,2024-10-09,2923.95,9,6,3,Mixed Pattern,Low,true
+70,107,2023-01-19,2416.12,22,9,4,Bulk Purchase Fraud,Medium,true
+42,108,2023-08-28,2905.82,20,8,3,Mixed Pattern,Low,true
+29,108,2023-09-12,2866.21,19,9,3,Mixed Pattern,Low,true
+116,108,2023-10-02,1341.82,22,10,3,Bulk Purchase Fraud,Low,true
+206,108,2024-09-20,6500.0,30,30,9,High Value Fraud,Critical,true
+1,109,2023-01-19,1509.85,26,9,5,Bulk Purchase Fraud,Medium,true
+24,109,2024-07-09,2250.92,16,9,3,Mixed Pattern,Low,true
+212,110,2024-11-12,2900.0,35,35,8,Bulk Purchase Fraud,Critical,true
+213,112,2024-11-20,3300.0,25,25,8,High Value Fraud,Critical,true
+214,115,2024-12-01,2100.0,18,18,5,Suspicious Quantity,Medium,true
+215,115,2024-12-01,2400.0,16,16,9,Velocity + High Value,Critical,true
+216,115,2024-12-01,1900.0,12,12,6,Velocity Fraud,High,true
+93,118,2023-02-25,2289.54,18,10,3,Mixed Pattern,Low,true
+91,118,2024-10-07,1104.58,23,8,3,Bulk Purchase Fraud,Low,true
+65,119,2023-09-20,1030.85,40,10,4,Bulk Purchase Fraud,Medium,true
+41,119,2024-03-26,1513.77,21,7,3,Bulk Purchase Fraud,Low,true
+37,120,2024-05-24,1128.12,29,10,3,Bulk Purchase Fraud,Low,true
+64,123,2023-12-19,2502.32,19,10,3,Mixed Pattern,Low,true
+113,126,2024-02-06,2944.09,25,8,4,Bulk Purchase Fraud,Medium,true
+137,127,2024-03-22,1425.3,21,10,3,Bulk Purchase Fraud,Low,true
+128,132,2023-04-01,2865.1,30,9,4,Bulk Purchase Fraud,Medium,true
+72,136,2024-03-05,2303.16,18,9,3,Mixed Pattern,Low,true
+97,147,2023-04-23,2757.22,24,10,4,Bulk Purchase Fraud,Medium,true
+133,147,2024-08-06,298.52,35,10,3,Bulk Purchase Fraud,Low,true
+95,148,2024-02-19,1670.29,23,10,3,Bulk Purchase Fraud,Low,true
+102,150,2023-04-09,2816.9,23,9,4,Bulk Purchase Fraud,Medium,true
+126,164,2023-10-02,1422.21,35,10,4,Bulk Purchase Fraud,Medium,true
+134,170,2024-04-06,2805.69,23,10,4,Bulk Purchase Fraud,Medium,true
+104,174,2024-11-28,2108.01,27,10,4,Bulk Purchase Fraud,Medium,true
+139,176,2023-12-24,2273.44,26,10,4,Bulk Purchase Fraud,Medium,true
+115,188,2024-10-03,2831.85,18,8,3,Mixed Pattern,Low,true
+129,192,2023-04-15,1056.37,29,10,3,Bulk Purchase Fraud,Low,true
+130,192,2024-05-10,2852.89,22,8,4,Bulk Purchase Fraud,Medium,true
+107,200,2023-11-26,2842.97,27,10,4,Bulk Purchase Fraud,Medium,true

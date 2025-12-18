@@ -583,20 +583,52 @@ def detect_potential_fraud_orders(df_orders_cleaned: DataFrame, df_order_items_c
                               "order_id", "left")
                         )
     
-    # Flag suspicious orders with more realistic thresholds
-    return (orders_with_items
-            .withColumn("fraud_score",
-                       (when(col("total_amount_cleaned") > 2000, 3).otherwise(0) +  # High amount (lowered threshold)
-                        when(col("total_amount_cleaned") > 1000, 1).otherwise(0) +  # Medium high amount
-                        when(col("days_since_last_order") < 1, 3).otherwise(0) +    # Same day orders
-                        when(col("days_since_last_order") < 7, 1).otherwise(0) +    # Orders within a week
-                        when(col("total_quantity") > 20, 2).otherwise(0) +          # High quantity (lowered)
-                        when(col("total_quantity") > 10, 1).otherwise(0) +          # Medium quantity
-                        when(col("max_item_quantity") > 10, 2).otherwise(0) +       # High single item qty (lowered)
-                        when(col("max_item_quantity") > 5, 1).otherwise(0)))        # Medium single item qty
+    # Flag suspicious orders with detailed scoring and fraud type classification
+    scored_orders = (orders_with_items
+                    .withColumn("amount_score", 
+                               when(col("total_amount_cleaned") > 5000, 4)
+                               .when(col("total_amount_cleaned") > 3000, 3)
+                               .when(col("total_amount_cleaned") > 2000, 2)
+                               .when(col("total_amount_cleaned") > 1000, 1)
+                               .otherwise(0))
+                    .withColumn("velocity_score",
+                               when(col("days_since_last_order") < 1, 4)      # Same day
+                               .when(col("days_since_last_order") < 3, 2)     # Within 3 days
+                               .when(col("days_since_last_order") < 7, 1)     # Within a week
+                               .otherwise(0))
+                    .withColumn("quantity_score",
+                               when(col("total_quantity") > 30, 3)
+                               .when(col("total_quantity") > 20, 2)
+                               .when(col("total_quantity") > 15, 1)
+                               .otherwise(0))
+                    .withColumn("item_score",
+                               when(col("max_item_quantity") > 25, 3)
+                               .when(col("max_item_quantity") > 15, 2)
+                               .when(col("max_item_quantity") > 10, 1)
+                               .otherwise(0))
+                    )
+    
+    # Calculate total fraud score and classify fraud types
+    return (scored_orders
+            .withColumn("fraud_score", 
+                       col("amount_score") + col("velocity_score") + 
+                       col("quantity_score") + col("item_score"))
+            .withColumn("fraud_type",
+                       when((col("velocity_score") >= 2) & (col("amount_score") >= 2), "Velocity + High Value")
+                       .when(col("velocity_score") >= 3, "Velocity Fraud")
+                       .when(col("amount_score") >= 3, "High Value Fraud")
+                       .when(col("quantity_score") >= 2, "Bulk Purchase Fraud")
+                       .when(col("item_score") >= 2, "Suspicious Quantity")
+                       .otherwise("Mixed Pattern"))
+            .withColumn("risk_level",
+                       when(col("fraud_score") >= 8, "Critical")
+                       .when(col("fraud_score") >= 6, "High")
+                       .when(col("fraud_score") >= 4, "Medium")
+                       .otherwise("Low"))
             .withColumn("potential_fraud",
-                       when(col("fraud_score") >= 3, True).otherwise(False))       # Lowered threshold
+                       when(col("fraud_score") >= 3, True).otherwise(False))
             .filter(col("potential_fraud") == True)
             .select("order_id", "customer_id", "order_date_cleaned", "total_amount_cleaned",
-                   "total_quantity", "fraud_score", "potential_fraud")
+                   "total_quantity", "max_item_quantity", "fraud_score", "fraud_type", 
+                   "risk_level", "potential_fraud")
             )
