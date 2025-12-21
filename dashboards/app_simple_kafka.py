@@ -21,11 +21,21 @@ from plotly.subplots import make_subplots
 
 # Import Simple Kafka components
 try:
-    from streaming.simple_kafka.server import get_server, SimpleKafkaConsumer
+    from streaming.simple_kafka.server import get_server, SimpleKafkaConsumer, start_simple_kafka_server
     SIMPLE_KAFKA_AVAILABLE = True
+    
+    # Auto-initialize server on import (for Streamlit Cloud)
+    try:
+        server = get_server()
+        # Check if server has topics, if not initialize it
+        if not server.list_topics():
+            start_simple_kafka_server()
+    except Exception:
+        # Server will be initialized on first use
+        pass
+        
 except ImportError:
     SIMPLE_KAFKA_AVAILABLE = False
-    st.error("Simple Kafka server not available. Please run: python simple_kafka_server.py")
 
 
 def safe_plotly_chart(fig, **kwargs):
@@ -42,6 +52,98 @@ def safe_dataframe(df, **kwargs):
         st.dataframe(df, use_container_width=True, **kwargs)
     except TypeError:
         st.dataframe(df, **kwargs)
+
+
+def generate_sample_data():
+    """Generate sample data for demonstration when no data is available."""
+    if not SIMPLE_KAFKA_AVAILABLE:
+        return False
+    
+    try:
+        from streaming.simple_kafka.server import SimpleKafkaProducer
+        import json
+        from datetime import datetime
+        import random
+        
+        producer = SimpleKafkaProducer(
+            value_serializer=lambda v: json.dumps(v).encode('utf-8')
+        )
+        
+        # Generate sample orders
+        for i in range(20):
+            order_id = 1000 + i
+            customer_id = 101 + (i % 10)
+            total_amount = round(random.uniform(25.99, 1999.99), 2)
+            
+            # Occasionally generate high-value orders
+            if random.random() < 0.1:
+                total_amount = round(random.uniform(2000, 8000), 2)
+            
+            order = {
+                'event_type': 'order',
+                'event_timestamp': datetime.now().isoformat(),
+                'order_id': order_id,
+                'customer_id': customer_id,
+                'order_date': datetime.now().strftime('%Y-%m-%d'),
+                'status': random.choice(['pending', 'processing', 'completed', 'cancelled']),
+                'total_amount': total_amount,
+                'payment_method': random.choice(['credit_card', 'debit_card', 'paypal']),
+                'source_system': 'demo_data'
+            }
+            
+            producer.send('ecommerce_orders', order)
+            
+            # Generate customer event (30% chance)
+            if random.random() < 0.3:
+                customer = {
+                    'event_type': 'customer_create',
+                    'customer_id': customer_id,
+                    'name': f'Customer {customer_id}',
+                    'email': f'customer{customer_id}@example.com',
+                    'customer_segment': random.choice(['Bronze', 'Silver', 'Gold', 'Platinum']),
+                    'event_timestamp': datetime.now().isoformat()
+                }
+                producer.send('ecommerce_customers', customer)
+            
+            # Generate order items (1-3 per order)
+            num_items = random.randint(1, 3)
+            for j in range(num_items):
+                item = {
+                    'event_type': 'order_item',
+                    'event_timestamp': datetime.now().isoformat(),
+                    'item_id': (i * 10) + j,
+                    'order_id': order_id,
+                    'product_name': f'Product {random.randint(1, 50)}',
+                    'category': random.choice(['Electronics', 'Clothing', 'Books', 'Home']),
+                    'quantity': random.randint(1, 3),
+                    'unit_price': round(total_amount / (num_items * 2), 2),
+                    'total_price': round(total_amount / num_items, 2)
+                }
+                producer.send('ecommerce_order_items', item)
+            
+            # Generate fraud alert (15% chance)
+            if random.random() < 0.15 or total_amount > 2000:
+                fraud_score = 3 if total_amount > 2000 else 2
+                alert = {
+                    'event_type': 'fraud_alert',
+                    'event_timestamp': datetime.now().isoformat(),
+                    'alert_id': f'FRAUD_{order_id}',
+                    'order_id': order_id,
+                    'customer_id': customer_id,
+                    'fraud_score': fraud_score,
+                    'risk_level': 'HIGH' if fraud_score >= 4 else 'MEDIUM',
+                    'reasons': ['High transaction amount'] if total_amount > 2000 else ['Suspicious pattern'],
+                    'total_amount': total_amount,
+                    'requires_review': fraud_score >= 4
+                }
+                producer.send('ecommerce_fraud_alerts', alert)
+        
+        producer.close()
+        return True
+        
+    except Exception as e:
+        st.error(f"Error generating sample data: {e}")
+        return False
 
 
 def get_simple_kafka_status():
@@ -186,21 +288,34 @@ def create_simple_kafka_status_section():
     """Display Simple Kafka server status."""
     st.header("🔄 Simple Kafka Status")
     
-    status = get_simple_kafka_status()
-    
-    if not status.get('server_running', False):
-        st.error("❌ Simple Kafka server not running")
+    if not SIMPLE_KAFKA_AVAILABLE:
+        st.error("❌ Simple Kafka server not available")
         st.info("""
-        **To start Simple Kafka server:**
-        ```bash
-        python streaming_data_generator_simple.py --burst
-        ```
+        **Simple Kafka is not available in this environment.**
         
-        **Or run the complete pipeline:**
+        This dashboard requires the Simple Kafka in-memory message broker.
+        For local development, run:
         ```bash
         python run_simple_kafka_pipeline.py
         ```
         """)
+        return
+    
+    status = get_simple_kafka_status()
+    
+    if not status.get('server_running', False):
+        st.error("❌ Simple Kafka server not running")
+        
+        # Try to initialize server
+        if st.button("🚀 Initialize Simple Kafka Server"):
+            try:
+                from streaming.simple_kafka.server import start_simple_kafka_server
+                start_simple_kafka_server()
+                st.success("✅ Server initialized!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to initialize server: {e}")
+        
         return
     
     # Server status
@@ -226,6 +341,17 @@ def create_simple_kafka_status_section():
     with col4:
         st.info("ℹ️ Development Mode")
         st.write("In-Memory Only")
+    
+    # Generate sample data if no messages
+    if status.get('total_messages', 0) == 0:
+        st.warning("⚠️ No data available")
+        if st.button("🎲 Generate Sample Data"):
+            with st.spinner("Generating sample data..."):
+                if generate_sample_data():
+                    st.success("✅ Sample data generated!")
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to generate sample data")
     
     # Topic details with enhanced display
     st.subheader("📋 Topic Details")
@@ -259,19 +385,21 @@ def create_simple_kafka_status_section():
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            if st.button("🔄 Start Data Generator"):
-                st.info("Run: `python streaming_data_generator_simple.py --burst`")
+            if st.button("🎲 Generate More Data"):
+                with st.spinner("Generating data..."):
+                    if generate_sample_data():
+                        st.success("✅ More data generated!")
+                        st.rerun()
         
         with col2:
-            if st.button("📊 View All Topics"):
-                st.info("All topic data is shown in the tabs above")
+            if st.button("🔄 Refresh Status"):
+                st.rerun()
         
         with col3:
-            if st.button("🧹 Clear All Topics"):
-                st.warning("This would clear all topic data (not implemented in demo)")
+            if st.button("📊 View All Topics"):
+                st.info("All topic data is shown in the tabs above")
     else:
-        st.info("No topics found. Start the data generator to create topics.")
-        st.code("python streaming_data_generator_simple.py --burst")
+        st.info("No topics found. Click 'Initialize Simple Kafka Server' to create topics.")
 
 
 def create_simple_kafka_metrics_section():
@@ -716,15 +844,50 @@ def main():
     - **Order Stream** - Recent orders with filtering capabilities
     """)
     
+def main():
+    """Main dashboard function."""
+    # Only set page config if not already set
+    try:
+        st.set_page_config(
+            page_title="Simple Kafka Real-Time Dashboard",
+            layout="wide",
+            initial_sidebar_state="expanded",
+            page_icon="⚡"
+        )
+    except Exception:
+        # Page config already set, continue
+        pass
+    
+    st.title("⚡ Simple Kafka Real-Time Dashboard")
+    st.markdown("""
+    **Live Data Pipeline Dashboard** - Real-time analytics from Simple Kafka in-memory broker
+    
+    This dashboard provides:
+    - **Server Status** - Monitor Simple Kafka broker and topics
+    - **Real-Time Metrics** - Live revenue, orders, and customer analytics  
+    - **Fraud Detection** - Suspicious pattern identification
+    - **Order Stream** - Recent orders with filtering capabilities
+    """)
+    
     # Check if Simple Kafka is available
     if not SIMPLE_KAFKA_AVAILABLE:
         st.error("❌ Simple Kafka server not available")
-        st.info("Please run: `python simple_kafka_server.py` or `python run_simple_kafka_pipeline.py`")
+        st.info("""
+        **Simple Kafka is not available in this environment.**
+        
+        This dashboard is designed to work with a Simple Kafka in-memory message broker.
+        
+        **For local development:**
+        1. Run: `python run_simple_kafka_pipeline.py`
+        2. Or run components separately:
+           - `python simple_kafka_server.py`
+           - `python streaming_data_generator_simple.py --burst`
+        """)
         return
     
     # Auto-refresh configuration in sidebar
     st.sidebar.header("⚙️ Dashboard Settings")
-    auto_refresh = st.sidebar.checkbox("Auto-refresh", value=True)
+    auto_refresh = st.sidebar.checkbox("Auto-refresh", value=False)  # Default off for Streamlit Cloud
     refresh_interval = st.sidebar.slider("Refresh interval (seconds)", 5, 60, 10)
     
     # Simple Kafka status in sidebar
@@ -745,7 +908,7 @@ def main():
     # Quick start in sidebar
     st.sidebar.markdown("---")
     st.sidebar.subheader("🚀 Quick Start")
-    st.sidebar.code("python run_simple_kafka_pipeline.py")
+    st.sidebar.info("Click 'Initialize Simple Kafka Server' in the Server Status tab to get started")
     
     # Navigation tabs
     st.markdown("---")
@@ -801,7 +964,7 @@ def main():
         elif page == "🚨 Fraud Alerts":
             create_simple_kafka_fraud_alerts_section()
     
-    # Auto-refresh logic
+    # Auto-refresh logic (disabled by default for Streamlit Cloud)
     if auto_refresh:
         time.sleep(refresh_interval)
         try:
@@ -809,10 +972,6 @@ def main():
                 st.rerun()
             elif hasattr(st, "experimental_rerun"):
                 st.experimental_rerun()
-            else:
-                # Fallback: JavaScript refresh
-                st.write(f'<meta http-equiv="refresh" content="{refresh_interval}">', 
-                        unsafe_allow_html=True)
         except Exception:
             # If auto-refresh fails, continue without it
             pass
