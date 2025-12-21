@@ -16,6 +16,9 @@ streamlit>=1.40.0,<2.0.0
 plotly>=5.0.0
 numpy>=1.21.0
 
+# Real-time Streaming (Optional/Embedded)
+kafka-python>=2.0.2
+
 # Optional: For advanced analytics (uncomment if needed)
 # scikit-learn>=1.0.0
 # matplotlib>=3.5.0

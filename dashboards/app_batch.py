@@ -12,7 +12,13 @@ This comprehensive dashboard showcases:
 from __future__ import annotations
 
 import os
+import sys
 import glob
+
+# Add project root to path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 from typing import Optional
 
 import pandas as pd
@@ -189,7 +195,7 @@ def create_fraud_detection_section():
         
     else:
         if not os.path.isdir(FRAUD_CSV_DIR):
-            st.info("Fraud detection hasn't been run yet. Run 'python main.py' to generate fraud detection results.")
+            st.info("Fraud detection hasn't been run yet. Run 'python scripts/run_batch_etl.py' to generate fraud detection results.")
         else:
             st.info("No potentially fraudulent orders detected in the current dataset.")
         
@@ -406,7 +412,7 @@ def main() -> None:
             
             st.info("""
             **To generate dashboard data:**
-            1. Run `python main.py` to execute the ETL pipeline
+            1. Run `python scripts/run_batch_etl.py` to execute the ETL pipeline
             2. Ensure the pipeline completes successfully
             3. Refresh this page
             
@@ -470,5 +476,3 @@ def enhanced_main() -> None:
 
 if __name__ == "__main__":
     enhanced_main()
-
-

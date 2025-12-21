@@ -2,10 +2,10 @@
 Convenience script to run the Streamlit dashboard.
 
 Usage:
-    python run_dashboard.py
+    python scripts/run_dashboard.py
 
 This will start the Streamlit server and open the dashboard in your browser.
-Make sure to run 'python main.py' first to generate the data.
+Make sure to run 'python scripts/run_batch_etl.py' first to generate the data.
 """
 
 import subprocess
@@ -15,12 +15,12 @@ import os
 def main():
     print("🚀 Starting E-Commerce ETL Dashboard...")
     print("📊 Dashboard URL: http://localhost:8501")
-    print("🔄 Run 'python main.py' first if you haven't generated data yet")
+    print("🔄 Run 'python scripts/run_batch_etl.py' first if you haven't generated data yet")
     print("=" * 60)
     
     try:
         # Get path to dashboard
-        dashboard_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "dashboards", "enhanced_app.py")
+        dashboard_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "dashboards", "app_batch.py")
         
         # Run streamlit
         subprocess.run([
