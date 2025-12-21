@@ -640,6 +640,9 @@ def create_simple_kafka_fraud_alerts_section():
         
         Fraud alerts are generated for ~15% of orders (higher for high-value orders)
         """)
+
+
+def create_simple_kafka_orders_section():
     """Display recent orders from Simple Kafka."""
     st.header("📦 Recent Orders (Simple Kafka)")
     
