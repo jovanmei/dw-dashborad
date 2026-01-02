@@ -187,7 +187,50 @@ def generate_sample_data():
 
 
 def get_simple_kafka_status():
-    """Get status from Simple Kafka server."""
+    """Get status from Simple Kafka server or return demo data."""
+    
+    # Return demo data if in demo mode
+    if hasattr(st, 'session_state') and st.session_state.get('demo_mode', False):
+        return {
+            'server_running': True,
+            'topics': {
+                'ecommerce_orders': {
+                    'partition_count': 3,
+                    'total_messages': 156,
+                    'partitions': {
+                        0: {'messages': 52, 'latest_offset': 51},
+                        1: {'messages': 52, 'latest_offset': 51},
+                        2: {'messages': 52, 'latest_offset': 51}
+                    }
+                },
+                'ecommerce_customers': {
+                    'partition_count': 2,
+                    'total_messages': 42,
+                    'partitions': {
+                        0: {'messages': 21, 'latest_offset': 20},
+                        1: {'messages': 21, 'latest_offset': 20}
+                    }
+                },
+                'ecommerce_order_items': {
+                    'partition_count': 3,
+                    'total_messages': 312,
+                    'partitions': {
+                        0: {'messages': 104, 'latest_offset': 103},
+                        1: {'messages': 104, 'latest_offset': 103},
+                        2: {'messages': 104, 'latest_offset': 103}
+                    }
+                },
+                'ecommerce_fraud_alerts': {
+                    'partition_count': 1,
+                    'total_messages': 23,
+                    'partitions': {
+                        0: {'messages': 23, 'latest_offset': 22}
+                    }
+                }
+            },
+            'total_messages': 533
+        }
+    
     if not SIMPLE_KAFKA_AVAILABLE:
         return {}
     
@@ -214,7 +257,139 @@ def get_simple_kafka_status():
 
 
 def load_simple_kafka_messages(topic: str, limit: int = 1000) -> Optional[pd.DataFrame]:
-    """Load recent messages from Simple Kafka topic."""
+    """Load recent messages from Simple Kafka topic or generate demo data."""
+    
+    # Generate demo data if in demo mode
+    if hasattr(st, 'session_state') and st.session_state.get('demo_mode', False):
+        import random
+        from datetime import datetime, timedelta
+        import pandas as pd
+        
+        # Generate synthetic data based on topic
+        if topic == 'ecommerce_orders':
+            # Generate sample orders
+            orders = []
+            now = datetime.now()
+            
+            for i in range(50):
+                order_date = now - timedelta(minutes=random.randint(0, 120))
+                total_amount = round(random.uniform(25.99, 1999.99), 2)
+                
+                # Occasionally generate high-value orders
+                if random.random() < 0.1:
+                    total_amount = round(random.uniform(2000, 8000), 2)
+                
+                order = {
+                    'event_type': 'order',
+                    'event_timestamp': order_date.isoformat(),
+                    'order_id': 1000 + i,
+                    'customer_id': 101 + (i % 10),
+                    'order_date': order_date.strftime('%Y-%m-%d'),
+                    'status': random.choice(['pending', 'processing', 'completed', 'cancelled']),
+                    'total_amount': total_amount,
+                    'payment_method': random.choice(['credit_card', 'debit_card', 'paypal']),
+                    'source_system': 'demo_data',
+                    '_kafka_timestamp': order_date,
+                    '_kafka_offset': i,
+                    '_kafka_partition': i % 3
+                }
+                orders.append(order)
+            
+            df = pd.DataFrame(orders)
+            
+        elif topic == 'ecommerce_customers':
+            # Generate sample customers
+            customers = []
+            now = datetime.now()
+            
+            for i in range(10):
+                customer = {
+                    'event_type': 'customer_create',
+                    'event_timestamp': (now - timedelta(days=i)).isoformat(),
+                    'customer_id': 101 + i,
+                    'name': f'Customer {101 + i}',
+                    'email': f'customer{101 + i}@example.com',
+                    'customer_segment': random.choice(['Bronze', 'Silver', 'Gold', 'Platinum']),
+                    '_kafka_timestamp': now - timedelta(days=i),
+                    '_kafka_offset': i,
+                    '_kafka_partition': i % 2
+                }
+                customers.append(customer)
+            
+            df = pd.DataFrame(customers)
+            
+        elif topic == 'ecommerce_order_items':
+            # Generate sample order items
+            order_items = []
+            now = datetime.now()
+            
+            for i in range(100):
+                order_id = 1000 + (i // 2)  # 2 items per order on average
+                order_items.append({
+                    'event_type': 'order_item',
+                    'event_timestamp': (now - timedelta(minutes=i)).isoformat(),
+                    'item_id': 2000 + i,
+                    'order_id': order_id,
+                    'product_name': f'Product {random.randint(1, 50)}',
+                    'category': random.choice(['Electronics', 'Clothing', 'Books', 'Home']),
+                    'quantity': random.randint(1, 3),
+                    'unit_price': round(random.uniform(10.99, 499.99), 2),
+                    'total_price': round(random.uniform(10.99, 999.99), 2),
+                    '_kafka_timestamp': now - timedelta(minutes=i),
+                    '_kafka_offset': i,
+                    '_kafka_partition': i % 3
+                })
+            
+            df = pd.DataFrame(order_items)
+            
+        elif topic == 'ecommerce_fraud_alerts':
+            # Generate sample fraud alerts
+            fraud_alerts = []
+            now = datetime.now()
+            
+            for i in range(15):
+                order_id = 1000 + i
+                total_amount = round(random.uniform(3000, 8000), 2)
+                fraud_alerts.append({
+                    'event_type': 'fraud_alert',
+                    'event_timestamp': (now - timedelta(minutes=i*5)).isoformat(),
+                    'alert_id': f'FRAUD_{order_id}',
+                    'order_id': order_id,
+                    'customer_id': 101 + (i % 10),
+                    'fraud_score': random.randint(3, 5),
+                    'risk_level': 'HIGH' if random.random() > 0.3 else 'MEDIUM',
+                    'reasons': ['High transaction amount', 'Unusual purchasing pattern'],
+                    'total_amount': total_amount,
+                    'requires_review': random.random() > 0.5,
+                    '_kafka_timestamp': now - timedelta(minutes=i*5),
+                    '_kafka_offset': i,
+                    '_kafka_partition': 0
+                })
+            
+            df = pd.DataFrame(fraud_alerts)
+        else:
+            return None
+        
+        # Sort by timestamp (newest first)
+        if '_kafka_timestamp' in df.columns:
+            df = df.sort_values('_kafka_timestamp', ascending=False)
+        elif 'event_timestamp' in df.columns:
+            df = df.sort_values('event_timestamp', ascending=False)
+        
+        # Limit the results
+        df = df.head(limit)
+        
+        # Convert timestamp columns
+        if '_kafka_timestamp' in df.columns:
+            df['_kafka_timestamp'] = pd.to_datetime(df['_kafka_timestamp'], errors='coerce')
+        if 'event_timestamp' in df.columns:
+            df['event_timestamp'] = pd.to_datetime(df['event_timestamp'], errors='coerce')
+        if 'order_date' in df.columns:
+            df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce')
+        
+        return df
+    
+    # Original implementation for live mode
     if not SIMPLE_KAFKA_AVAILABLE:
         return None
     
@@ -880,6 +1055,10 @@ def main():
         # Page config already set, continue
         pass
     
+    # Initialize session state for demo mode
+    if 'demo_mode' not in st.session_state:
+        st.session_state.demo_mode = True  # Default to demo mode for online deployment
+    
     st.title("⚡ Simple Kafka Real-Time Dashboard")
     st.markdown("""
     **Live Data Pipeline Dashboard** - Real-time analytics from Simple Kafka in-memory broker
@@ -891,46 +1070,66 @@ def main():
     - **Order Stream** - Recent orders with filtering capabilities
     """)
     
-    # Check if Simple Kafka is available
-    if not SIMPLE_KAFKA_AVAILABLE:
+    # Sidebar settings with demo mode toggle
+    st.sidebar.header("⚙️ Dashboard Settings")
+    st.session_state.demo_mode = st.sidebar.checkbox(
+        "🟢 Run in Demo Mode", 
+        value=st.session_state.demo_mode,
+        help="Enable demo mode to use sample data without requiring a Simple Kafka server"
+    )
+    
+    if st.session_state.demo_mode:
+        st.sidebar.success("📊 Demo Mode: Using Sample Data")
+        st.sidebar.info("In demo mode, the dashboard uses synthetic sample data instead of connecting to a Simple Kafka server.")
+    else:
+        st.sidebar.warning("🔴 Live Mode: Requires Simple Kafka Server")
+        st.sidebar.info("In live mode, the dashboard connects to a running Simple Kafka server at http://localhost:5051.")
+    
+    # Auto-refresh configuration in sidebar
+    st.sidebar.markdown("---")
+    auto_refresh = st.sidebar.checkbox("Auto-refresh", value=False)  # Default off for Streamlit Cloud
+    refresh_interval = st.sidebar.slider("Refresh interval (seconds)", 5, 60, 10)
+    
+    # Show Simple Kafka status only if in live mode and server is available
+    if st.session_state.demo_mode:
+        st.sidebar.markdown("---")
+        st.sidebar.success("📊 Demo Mode Active")
+        st.sidebar.info("Using synthetic sample data for demonstration")
+    else:
+        # Simple Kafka status in sidebar
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("📡 Simple Kafka Status")
+        
+        try:
+            status = get_simple_kafka_status()
+            if status.get('server_running', False):
+                st.sidebar.success("✅ Server Running")
+                st.sidebar.write(f"📁 Topics: {len(status.get('topics', {}))}")
+                st.sidebar.write(f"📁 Messages: {status.get('total_messages', 0)}")
+            else:
+                st.sidebar.error("❌ Server Not Running")
+        except Exception:
+            st.sidebar.error("❌ Connection Failed")
+        
+        # Quick start in sidebar
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("🚀 Quick Start")
+        st.sidebar.info("Click 'Initialize Simple Kafka Server' in the Server Status tab to get started")
+    
+    # If in demo mode, we don't need to check SIMPLE_KAFKA_AVAILABLE
+    if not st.session_state.demo_mode and not SIMPLE_KAFKA_AVAILABLE:
         st.error("❌ Simple Kafka server not available")
         st.info("""
         **Simple Kafka is not available in this environment.**
         
-        This dashboard is designed to work with a Simple Kafka in-memory message broker.
+        This dashboard is currently in live mode but cannot connect to a Simple Kafka server.
         
-        **For local development:**
-        1. Run: `python run_simple_kafka_pipeline.py`
-        2. Or run components separately:
-           - `python simple_kafka_server.py`
-           - `python streaming_data_generator_simple.py --burst`
+        **Options:**
+        1. **Switch to Demo Mode** - Use the toggle in settings to enable sample data
+        2. **For local development:**
+           - Run: `python scripts/run_streaming_simple.py`
         """)
         return
-    
-    # Auto-refresh configuration in sidebar
-    st.sidebar.header("⚙️ Dashboard Settings")
-    auto_refresh = st.sidebar.checkbox("Auto-refresh", value=False)  # Default off for Streamlit Cloud
-    refresh_interval = st.sidebar.slider("Refresh interval (seconds)", 5, 60, 10)
-    
-    # Simple Kafka status in sidebar
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📡 Simple Kafka Status")
-    
-    try:
-        status = get_simple_kafka_status()
-        if status.get('server_running', False):
-            st.sidebar.success("✅ Server Running")
-            st.sidebar.write(f"📁 Topics: {len(status.get('topics', {}))}")
-            st.sidebar.write(f"📁 Messages: {status.get('total_messages', 0)}")
-        else:
-            st.sidebar.error("❌ Server Not Running")
-    except Exception:
-        st.sidebar.error("❌ Connection Failed")
-    
-    # Quick start in sidebar
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🚀 Quick Start")
-    st.sidebar.info("Click 'Initialize Simple Kafka Server' in the Server Status tab to get started")
     
     # Navigation tabs
     st.markdown("---")
