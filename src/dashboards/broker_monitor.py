@@ -25,26 +25,11 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# Import Simple Kafka components
+# Import Simple Kafka components - only import the module, don't initialize yet
 try:
     from src.streaming.simple.server import get_server, SimpleKafkaConsumer, start_simple_kafka_server
     SIMPLE_KAFKA_AVAILABLE = True
-    
-    # Auto-initialize server on import
-    try:
-        # First try to connect to the REST server
-        server = get_server(bootstrap_servers='http://localhost:5051')
-        # Check if server is alive by listing topics
-        server.list_topics()
-    except Exception:
-        try:
-            # Fallback to local server
-            server = get_server()
-            if not server.list_topics():
-                start_simple_kafka_server()
-        except Exception:
-            pass
-        
+    # Don't attempt to connect at import time - this causes issues when server isn't available
 except ImportError:
     SIMPLE_KAFKA_AVAILABLE = False
 
@@ -67,7 +52,21 @@ def safe_dataframe(df, **kwargs):
 
 def generate_sample_data():
     """Generate sample data for demonstration when no data is available."""
+    
+    # In demo mode, we don't generate actual messages - we just refresh the dashboard
+    if hasattr(st, 'session_state') and st.session_state.get('demo_mode', False):
+        st.write("📊 Demo mode: Refreshing sample data...")
+        # In demo mode, simply refresh the dashboard - the data generation happens in load_simple_kafka_messages
+        if hasattr(st, 'rerun'):
+            st.rerun()
+        elif hasattr(st, 'experimental_rerun'):
+            st.experimental_rerun()
+        return True
+    
+    # Only attempt actual message generation in live mode
     if not SIMPLE_KAFKA_AVAILABLE:
+        st.error("❌ Cannot generate data in live mode without Simple Kafka server")
+        st.info("Switch to Demo Mode to use sample data")
         return False
     
     try:
