@@ -237,27 +237,6 @@ def get_simple_kafka_status():
             return {'error': f'HTTP {response.status_code}', 'server_running': False}
     
     except Exception as e:
-        # Fall back to using the imported server module if REST API fails
-        try:
-            if SIMPLE_KAFKA_AVAILABLE:
-                server = get_server(bootstrap_servers='http://localhost:5051')
-                topics = server.list_topics()
-                
-                status = {
-                    'server_running': True,
-                    'topics': {},
-                    'total_messages': 0
-                }
-                
-                for topic in topics:
-                    topic_info = server.get_topic_info(topic)
-                    status['topics'][topic] = topic_info
-                    status['total_messages'] += topic_info.get('total_messages', 0)
-                
-                return status
-        except Exception as module_e:
-            pass
-        
         return {'error': str(e), 'server_running': False}
 
 
