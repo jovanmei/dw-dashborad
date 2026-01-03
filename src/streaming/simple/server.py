@@ -24,7 +24,17 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Union
 from pathlib import Path
 import threading
-from flask import Flask, request, jsonify
+
+# Make Flask an optional dependency
+flask_available = False
+try:
+    from flask import Flask, request, jsonify
+    flask_available = True
+except ImportError:
+    Flask = None
+    request = None
+    jsonify = None
+    app = None
 
 class SimpleKafkaServer:
     """
@@ -389,7 +399,9 @@ class RestKafkaServerProxy:
         except: return []
 
 _server = None
-_app = Flask(__name__)
+_app = None
+if flask_available:
+    _app = Flask(__name__)
 
 def get_server(bootstrap_servers: Optional[str] = None):
     global _server
@@ -408,58 +420,59 @@ def get_server(bootstrap_servers: Optional[str] = None):
             _server = SimpleKafkaServer()
     return _server
 
-@_app.route('/topics', methods=['GET'])
-def api_list_topics():
-    return jsonify(get_server().list_topics())
+if flask_available:
+    @_app.route('/topics', methods=['GET'])
+    def api_list_topics():
+        return jsonify(get_server().list_topics())
 
-@_app.route('/topics/<topic>', methods=['GET'])
-def api_topic_info(topic):
-    return jsonify(get_server().get_topic_info(topic))
+    @_app.route('/topics/<topic>', methods=['GET'])
+    def api_topic_info(topic):
+        return jsonify(get_server().get_topic_info(topic))
 
-@_app.route('/produce/<topic>', methods=['POST'])
-def api_produce(topic):
-    data = request.json
-    value = data.get('value')
-    key = data.get('key')
-    partition = data.get('partition', 0)
-    offset = get_server().send_message(topic, value, key, partition)
-    return jsonify({'offset': offset, 'topic': topic, 'partition': partition})
+    @_app.route('/produce/<topic>', methods=['POST'])
+    def api_produce(topic):
+        data = request.json
+        value = data.get('value')
+        key = data.get('key')
+        partition = data.get('partition', 0)
+        offset = get_server().send_message(topic, value, key, partition)
+        return jsonify({'offset': offset, 'topic': topic, 'partition': partition})
 
-@_app.route('/consume/<topic>', methods=['GET'])
-def api_consume(topic):
-    partition = int(request.args.get('partition', 0))
-    from_offset = request.args.get('from_offset')
-    if from_offset is not None: from_offset = int(from_offset)
-    limit = int(request.args.get('limit', 100))
-    
-    msgs = get_server().consume_messages(topic, partition, from_offset, limit)
-    return jsonify(msgs)
+    @_app.route('/consume/<topic>', methods=['GET'])
+    def api_consume(topic):
+        partition = int(request.args.get('partition', 0))
+        from_offset = request.args.get('from_offset')
+        if from_offset is not None: from_offset = int(from_offset)
+        limit = int(request.args.get('limit', 100))
+        
+        msgs = get_server().consume_messages(topic, partition, from_offset, limit)
+        return jsonify(msgs)
 
-@_app.route('/groups/<group_id>/commit', methods=['POST'])
-def api_commit(group_id):
-    data = request.json
-    topic = data.get('topic')
-    partition = data.get('partition')
-    offset = data.get('offset')
-    get_server().commit_offset(group_id, topic, partition, offset)
-    return jsonify({'status': 'success'})
+    @_app.route('/groups/<group_id>/commit', methods=['POST'])
+    def api_commit(group_id):
+        data = request.json
+        topic = data.get('topic')
+        partition = data.get('partition')
+        offset = data.get('offset')
+        get_server().commit_offset(group_id, topic, partition, offset)
+        return jsonify({'status': 'success'})
 
-@_app.route('/groups/<group_id>/offset/<topic>/<int:partition>', methods=['GET'])
-def api_get_offset(group_id, topic, partition):
-    offset = get_server().get_committed_offset(group_id, topic, partition)
-    return jsonify({'offset': offset})
+    @_app.route('/groups/<group_id>/offset/<topic>/<int:partition>', methods=['GET'])
+    def api_get_offset(group_id, topic, partition):
+        offset = get_server().get_committed_offset(group_id, topic, partition)
+        return jsonify({'offset': offset})
 
-@_app.route('/groups/<group_id>/heartbeat', methods=['POST'])
-def api_heartbeat(group_id):
-    member_id = request.json.get('member_id')
-    get_server().register_consumer(group_id, member_id)
-    return jsonify({'status': 'ok'})
+    @_app.route('/groups/<group_id>/heartbeat', methods=['POST'])
+    def api_heartbeat(group_id):
+        member_id = request.json.get('member_id')
+        get_server().register_consumer(group_id, member_id)
+        return jsonify({'status': 'ok'})
 
-@_app.route('/groups/<group_id>/assignments/<topic>', methods=['GET'])
-def api_assignments(group_id, topic):
-    member_id = request.args.get('member_id')
-    assignments = get_server().get_group_assignments(group_id, topic, member_id)
-    return jsonify({'partitions': assignments})
+    @_app.route('/groups/<group_id>/assignments/<topic>', methods=['GET'])
+    def api_assignments(group_id, topic):
+        member_id = request.args.get('member_id')
+        assignments = get_server().get_group_assignments(group_id, topic, member_id)
+        return jsonify({'partitions': assignments})
 
 class SimpleKafkaProducer:
     def __init__(self, bootstrap_servers=None, **kwargs):
@@ -600,6 +613,10 @@ class SimpleKafkaConsumer:
 
 def run_server(port=5050):
     """Start the REST API server."""
+    if not flask_available:
+        print(f"[ERROR] Cannot start Simple Kafka REST Server - Flask is not available")
+        return False
+    
     print(f"[START] Starting Simple Kafka REST Server on port {port}...")
     # Pre-create topics
     srv = get_server()
@@ -631,7 +648,7 @@ if __name__ == "__main__":
                 print(f"Invalid port '{sys.argv[3]}', using default 5050")
         run_server(port=port)
     else:
-        # Self-test
+        # Self-test - should work without Flask
         srv = start_simple_kafka_server()
         prod = SimpleKafkaProducer()
         prod.send("ecommerce_orders", {"test": "data"})

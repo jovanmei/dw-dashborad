@@ -28,9 +28,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# Import Simple Kafka Server components
-from src.streaming.simple.server import SimpleKafkaServer, start_simple_kafka_server, run_server
-
 # Server configuration
 SERVER_URL = "http://localhost:5051"
 
@@ -38,41 +35,67 @@ SERVER_URL = "http://localhost:5051"
 kafka_server = None
 server_thread = None
 
+# Flask availability flag
+flask_available = False
+try:
+    # Try to import Flask to check availability
+    import flask
+    flask_available = True
+    # Import Simple Kafka Server components if Flask is available
+    from src.streaming.simple.server import SimpleKafkaServer, start_simple_kafka_server, run_server
+    st.write("✅ Flask available for Simple Kafka Server")
+except ImportError:
+    st.write("⚠️ Flask not available - Simple Kafka Server functionality limited")
+    SimpleKafkaServer = None
+    start_simple_kafka_server = None
+    run_server = None
+
 # Function to start Kafka server in background thread
 def start_kafka_server_in_background():
-    """Start Simple Kafka server in a background thread."""
+    """Start Simple Kafka server in a background thread if Flask is available."""
     global kafka_server, server_thread
+    
+    if not flask_available:
+        st.error("❌ Cannot start Simple Kafka Server: Flask dependency not available")
+        st.info("This feature requires Flask to be installed. Demo mode will continue to work.")
+        return False
     
     if kafka_server is None:
         st.write("🚀 Initializing Simple Kafka Server...")
         
-        # Initialize server instance
-        kafka_server = start_simple_kafka_server()
-        
-        # Pre-create topics
-        topics = [
-            ("ecommerce_orders", 3),
-            ("ecommerce_customers", 2),
-            ("ecommerce_order_items", 3),
-            ("ecommerce_fraud_alerts", 1)
-        ]
-        for name, partitions in topics:
-            kafka_server.create_topic(name, partitions)
-        
-        st.write("✅ Simple Kafka Server initialized successfully!")
-        
-        # Start REST server in background thread
-        def run_server_thread():
-            try:
-                run_server(port=5051)
-            except Exception as e:
-                st.error(f"Server error: {e}")
-        
-        server_thread = threading.Thread(target=run_server_thread, daemon=True)
-        server_thread.start()
-        st.write("🌐 REST API server started on port 5051")
-        
-        return True
+        try:
+            # Initialize server instance
+            kafka_server = start_simple_kafka_server()
+            
+            # Pre-create topics
+            topics = [
+                ("ecommerce_orders", 3),
+                ("ecommerce_customers", 2),
+                ("ecommerce_order_items", 3),
+                ("ecommerce_fraud_alerts", 1)
+            ]
+            for name, partitions in topics:
+                kafka_server.create_topic(name, partitions)
+            
+            st.write("✅ Simple Kafka Server initialized successfully!")
+            
+            # Start REST server in background thread
+            def run_server_thread():
+                try:
+                    run_server(port=5051)
+                except Exception as e:
+                    st.error(f"Server error: {e}")
+            
+            server_thread = threading.Thread(target=run_server_thread, daemon=True)
+            server_thread.start()
+            st.write("🌐 REST API server started on port 5051")
+            
+            return True
+        except Exception as e:
+            st.error(f"Failed to start Kafka server: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+            return False
     return False
 
 
@@ -841,8 +864,13 @@ def create_simple_kafka_status_section():
         if 'error' in status:
             st.info(f"Error: {status['error']}")
         
-        # Try to initialize integrated server
+        # Try to initialize integrated server only if Flask is available
         if st.button("🚀 Initialize Simple Kafka Server"):
+            if not flask_available:
+                st.error("❌ Cannot start server: Flask dependency not available")
+                st.info("Demo mode works without Flask. Please enable it in settings.")
+                return
+            
             try:
                 with st.spinner("Starting Kafka server..."):
                     if start_kafka_server_in_background():
@@ -878,8 +906,9 @@ def create_simple_kafka_status_section():
         st.metric("Active Topics", active_topics)
     
     with col4:
-        st.info("ℹ️ Integrated Mode")
-        st.write("Kafka Server Embedded")
+        server_mode = "Integrated Mode" if flask_available else "Demo Mode"
+        st.info(f"ℹ️ {server_mode}")
+        st.write("Kafka Server Embedded" if flask_available else "Using Synthetic Data")
     
     # Generate sample data if no messages
     if status.get('total_messages', 0) == 0:
@@ -1396,10 +1425,15 @@ def main():
     - **Order Stream** - Recent orders with filtering capabilities
     """)
     
-    # Start Kafka server automatically when not in demo mode
+    # Start Kafka server automatically when not in demo mode and Flask is available
     if not st.session_state.demo_mode:
-        with st.spinner("Initializing Simple Kafka Server..."):
-            start_kafka_server_in_background()
+        if flask_available:
+            with st.spinner("Initializing Simple Kafka Server..."):
+                start_kafka_server_in_background()
+        else:
+            st.warning("⚠️ Live mode requires Flask. Please enable demo mode instead.")
+            # Auto-switch to demo mode if Flask is not available
+            st.session_state.demo_mode = True
     
     # Sidebar settings with demo mode toggle
     st.sidebar.header("⚙️ Dashboard Settings")
