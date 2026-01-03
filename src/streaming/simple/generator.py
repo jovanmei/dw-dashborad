@@ -53,22 +53,83 @@ class EnhancedDataGenerator:
         }
     
     def _generate_products(self) -> List[Dict]:
-        """Generate a catalog of products."""
-        categories = ['Electronics', 'Clothing', 'Books', 'Home', 'Sports', 'Beauty']
+        """Generate a catalog of realistic products."""
+        
+        # Enhanced realistic product categories and names
+        product_categories = {
+            'Electronics': ['Smartphone', 'Laptop', 'Tablet', 'Headphones', 'Smart Watch', 'Camera',
+                           'Bluetooth Speaker', 'Gaming Console', 'Monitor', 'Keyboard', 'Mouse', 'Printer'],
+            'Clothing': ['T-Shirt', 'Jeans', 'Sweater', 'Jacket', 'Dress', 'Shirt', 'Pants', 'Shorts',
+                        'Skirt', 'Blouse', 'Socks', 'Shoes'],
+            'Books': ['Novel', 'Biography', 'Self-Help', 'Cookbook', 'Textbook', 'Science Fiction',
+                     'Mystery', 'Romance', 'History', 'Children\'s Book', 'Poetry', 'Business'],
+            'Home': ['Furniture', 'Kitchenware', 'Bedding', 'Decor', 'Cleaning Supplies', 'Tools',
+                    'Appliances', 'Gardening', 'Storage', 'Lighting', 'Bathroom', 'Outdoor'],
+            'Sports': ['Running Shoes', 'Yoga Mat', 'Dumbbells', 'Soccer Ball', 'Basketball', 'Tennis Racket',
+                      'Golf Clubs', 'Fitness Tracker', 'Water Bottle', 'Sports Bag', 'Helmet', 'Bike'],
+            'Beauty': ['Skincare Set', 'Makeup Kit', 'Perfume', 'Shampoo', 'Conditioner', 'Moisturizer',
+                      'Sunscreen', 'Lipstick', 'Foundation', 'Mascara', 'Face Mask', 'Body Lotion']
+        }
+        
         products = []
+        adjectives = ['Premium', 'Deluxe', 'Classic', 'Modern', 'Vintage', 'Organic',
+                    'Eco-Friendly', 'Smart', 'Wireless', 'Noise-Canceling', 'Waterproof', 'Durable']
         
         for i in range(50):
+            # Get random category
+            category = random.choice(list(product_categories.keys()))
+            
+            # Get random product type from category
+            product_type = random.choice(product_categories[category])
+            
+            # Generate realistic product name
+            if random.random() < 0.3:
+                # Add an adjective to 30% of product names
+                product_name = f"{random.choice(adjectives)} {product_type}"
+            else:
+                product_name = product_type
+            
+            # Realistic prices based on category
+            category_prices = {
+                'Electronics': (19.99, 999.99),
+                'Clothing': (9.99, 199.99),
+                'Books': (4.99, 49.99),
+                'Home': (14.99, 499.99),
+                'Sports': (19.99, 299.99),
+                'Beauty': (9.99, 149.99)
+            }
+            min_price, max_price = category_prices[category]
+            price = round(random.uniform(min_price, max_price), 2)
+            
             products.append({
                 'product_id': f'PROD_{i+1:03d}',
-                'name': f'Product {i+1}',
-                'category': random.choice(categories),
-                'price': round(random.uniform(9.99, 999.99), 2)
+                'name': product_name,
+                'category': category,
+                'price': price
             })
         
         return products
     
     def generate_customer_event(self) -> Dict:
-        """Generate a customer event."""
+        """Generate a customer event with realistic customer data."""
+        
+        # Realistic first and last names
+        first_names = ['John', 'Jane', 'Michael', 'Sarah', 'David', 'Emma', 'James', 'Olivia',
+                      'Robert', 'Ava', 'William', 'Sophia', 'Joseph', 'Isabella', 'Thomas', 'Mia',
+                      'Charles', 'Charlotte', 'Daniel', 'Amelia', 'Matthew', 'Harper', 'Anthony', 'Evelyn',
+                      'Donald', 'Abigail', 'Mark', 'Emily', 'Paul', 'Elizabeth', 'Andrew', 'Sofia',
+                      'Joshua', 'Avery', 'Kevin', 'Ella', 'Brian', 'Scarlett', 'George', 'Grace',
+                      'Edward', 'Chloe', 'Ryan', 'Victoria', 'Jason', 'Riley', 'Jeff', 'Lily',
+                      'Gary', 'Madison', 'Kevin', 'Eleanor', 'Tim', 'Hannah', 'Steve', 'Layla']
+        
+        last_names = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis',
+                     'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas',
+                     'Taylor', 'Moore', 'Jackson', 'Martin', 'Lee', 'Perez', 'Thompson', 'White',
+                     'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson', 'Walker', 'Young',
+                     'Allen', 'King', 'Wright', 'Scott', 'Torres', 'Nguyen', 'Hill', 'Flores',
+                     'Green', 'Adams', 'Nelson', 'Baker', 'Hall', 'Rivera', 'Campbell', 'Mitchell',
+                     'Carter', 'Roberts', 'Gomez', 'Phillips', 'Evans', 'Turner', 'Diaz', 'Parker']
+        
         # Sometimes update existing customer, sometimes create new
         if random.random() < 0.3 and self.customers_cache:
             # Update existing customer
@@ -81,18 +142,43 @@ class EnhancedDataGenerator:
             customer_id = self.customer_id
             self.customer_id += 1
             
+            # Generate realistic name
+            first_name = random.choice(first_names)
+            last_name = random.choice(last_names)
+            full_name = f"{first_name} {last_name}"
+            
+            # Generate realistic email
+            email = f"{first_name.lower()}.{last_name.lower()}{random.randint(1, 99)}@example.com"
+            
+            # Generate realistic phone number
+            area_code = random.choice(['202', '213', '312', '713', '602', '305', '415', '773', '212', '303'])
+            phone = f'+1-{area_code}-{random.randint(100, 999)}-{random.randint(1000, 9999)}'
+            
+            # Realistic streets
+            streets = ['Main St', 'Maple Ave', 'Oak St', 'Cedar Rd', 'Pine Ln', 'Elm St',
+                      'Birch Ave', 'Walnut St', 'Chestnut Rd', 'Ash Ln', 'Spruce St', 'Willow Ave']
+            street = random.choice(streets)
+            
+            # Realistic customer segments with proper distribution
+            segments = ['Bronze', 'Silver', 'Gold', 'Platinum']
+            segment_weights = [0.5, 0.3, 0.15, 0.05]
+            customer_segment = random.choices(segments, weights=segment_weights)[0]
+            
             customer = {
                 'event_type': 'customer_create',
                 'customer_id': customer_id,
-                'name': f'Customer {customer_id}',
-                'email': f'customer{customer_id}@example.com',
-                'phone': f'+1-555-{random.randint(1000, 9999)}',
-                'address': f'{random.randint(100, 9999)} Main St',
-                'city': random.choice(['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix']),
-                'state': random.choice(['NY', 'CA', 'IL', 'TX', 'AZ']),
+                'name': full_name,
+                'first_name': first_name,
+                'last_name': last_name,
+                'email': email,
+                'phone': phone,
+                'address': f'{random.randint(100, 9999)} {street}',
+                'city': random.choice(['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix',
+                                      'Philadelphia', 'San Antonio', 'San Diego', 'Dallas', 'San Francisco']),
+                'state': random.choice(['NY', 'CA', 'IL', 'TX', 'AZ', 'PA', 'FL', 'OH', 'GA', 'NC']),
                 'zip_code': f'{random.randint(10000, 99999)}',
                 'registration_date': datetime.now().strftime('%Y-%m-%d'),
-                'customer_segment': random.choice(['Bronze', 'Silver', 'Gold', 'Platinum']),
+                'customer_segment': customer_segment,
                 'event_timestamp': datetime.now().isoformat()
             }
             

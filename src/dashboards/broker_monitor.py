@@ -11,6 +11,8 @@ import time
 import sys
 import os
 import requests
+import random
+import threading
 from typing import Optional, Dict, List
 
 # Add project root to path if not already there
@@ -26,8 +28,52 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+# Import Simple Kafka Server components
+from src.streaming.simple.server import SimpleKafkaServer, start_simple_kafka_server, run_server
+
 # Server configuration
 SERVER_URL = "http://localhost:5051"
+
+# Global server instance
+kafka_server = None
+server_thread = None
+
+# Function to start Kafka server in background thread
+def start_kafka_server_in_background():
+    """Start Simple Kafka server in a background thread."""
+    global kafka_server, server_thread
+    
+    if kafka_server is None:
+        st.write("🚀 Initializing Simple Kafka Server...")
+        
+        # Initialize server instance
+        kafka_server = start_simple_kafka_server()
+        
+        # Pre-create topics
+        topics = [
+            ("ecommerce_orders", 3),
+            ("ecommerce_customers", 2),
+            ("ecommerce_order_items", 3),
+            ("ecommerce_fraud_alerts", 1)
+        ]
+        for name, partitions in topics:
+            kafka_server.create_topic(name, partitions)
+        
+        st.write("✅ Simple Kafka Server initialized successfully!")
+        
+        # Start REST server in background thread
+        def run_server_thread():
+            try:
+                run_server(port=5051)
+            except Exception as e:
+                st.error(f"Server error: {e}")
+        
+        server_thread = threading.Thread(target=run_server_thread, daemon=True)
+        server_thread.start()
+        st.write("🌐 REST API server started on port 5051")
+        
+        return True
+    return False
 
 
 def safe_plotly_chart(fig, **kwargs):
@@ -49,20 +95,28 @@ def safe_dataframe(df, **kwargs):
 def generate_sample_data():
     """Generate sample data for demonstration when no data is available."""
     
-    # In demo mode, we don't generate actual messages - we just refresh the dashboard
-    if hasattr(st, 'session_state') and st.session_state.get('demo_mode', False):
-        st.write("📊 Demo mode: Refreshing sample data...")
-        # In demo mode, simply refresh the dashboard - the data generation happens in load_simple_kafka_messages
-        if hasattr(st, 'rerun'):
-            st.rerun()
-        elif hasattr(st, 'experimental_rerun'):
-            st.experimental_rerun()
-        return True
-    
     try:
         import json
         from datetime import datetime
         import random
+        
+        # Demo mode handling - generate realistic data and refresh
+        if hasattr(st, 'session_state') and st.session_state.get('demo_mode', False):
+            st.write("📊 Demo mode: Generating new sample data...")
+            
+            # Increment data generation counter to ensure new data each time
+            if 'data_generation_count' not in st.session_state:
+                st.session_state.data_generation_count = 0
+            st.session_state.data_generation_count += 1
+            
+            st.write(f"   Generation #{st.session_state.data_generation_count}")
+            
+            # Refresh the dashboard to show new data
+            if hasattr(st, 'rerun'):
+                st.rerun()
+            elif hasattr(st, 'experimental_rerun'):
+                st.experimental_rerun()
+            return True
         
         # Debug: Print connection attempt
         st.write("🔧 Attempting to connect to Simple Kafka server...")
@@ -70,24 +124,58 @@ def generate_sample_data():
         # Generate and send messages using REST API
         generated_count = 0
         
+        # Enhanced realistic data generation for live mode
+        # Realistic first and last names
+        first_names = ['John', 'Jane', 'Michael', 'Sarah', 'David', 'Emma', 'James', 'Olivia']
+        last_names = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis']
+        
+        # Realistic product categories and names
+        product_categories = {
+            'Electronics': ['Smartphone', 'Laptop', 'Tablet', 'Headphones', 'Smart Watch'],
+            'Clothing': ['T-Shirt', 'Jeans', 'Sweater', 'Jacket', 'Dress'],
+            'Books': ['Novel', 'Biography', 'Self-Help', 'Cookbook', 'Science Fiction'],
+            'Home': ['Furniture', 'Kitchenware', 'Bedding', 'Decor', 'Tools']
+        }
+        
         for i in range(20):
-            order_id = 1000 + i
-            customer_id = 101 + (i % 10)
-            total_amount = round(random.uniform(25.99, 1999.99), 2)
+            # Generate realistic customer
+            first_name = random.choice(first_names)
+            last_name = random.choice(last_names)
+            customer_id = 1000 + (generated_count * 10) + i
             
-            # Occasionally generate high-value orders
-            if random.random() < 0.1:
-                total_amount = round(random.uniform(2000, 8000), 2)
+            # Generate realistic order amount with proper distribution
+            price_ranges = [
+                (10.99, 49.99, 0.5),   # 50% under $50
+                (50.00, 199.99, 0.3),  # 30% $50-$200
+                (200.00, 499.99, 0.15), # 15% $200-$500
+                (500.00, 2999.99, 0.05), # 5% $500-$3000
+            ]
+            price_range = random.choices(
+                [r[0:2] for r in price_ranges], 
+                weights=[r[2] for r in price_ranges]
+            )[0]
+            total_amount = round(random.uniform(*price_range), 2)
+            
+            # Occasionally generate high-value orders (potential fraud)
+            if random.random() < 0.08:
+                total_amount = round(random.uniform(3000, 15000), 2)
             
             order = {
                 'event_type': 'order',
                 'event_timestamp': datetime.now().isoformat(),
-                'order_id': order_id,
+                'order_id': 2000 + generated_count * 20 + i,
                 'customer_id': customer_id,
                 'order_date': datetime.now().strftime('%Y-%m-%d'),
-                'status': random.choice(['pending', 'processing', 'completed', 'cancelled']),
+                'status': random.choices(
+                    ['pending', 'processing', 'completed', 'cancelled', 'refunded'],
+                    weights=[0.15, 0.25, 0.5, 0.08, 0.02]
+                )[0],
                 'total_amount': total_amount,
-                'payment_method': random.choice(['credit_card', 'debit_card', 'paypal']),
+                'payment_method': random.choices(
+                    ['credit_card', 'debit_card', 'paypal', 'bank_transfer', 'apple_pay'],
+                    weights=[0.4, 0.3, 0.15, 0.1, 0.05]
+                )[0],
+                'shipping_address': f'{random.randint(100, 9999)} Main St, {random.choice(["New York", "Los Angeles", "Chicago"])}',
                 'source_system': 'demo_data'
             }
             
@@ -96,51 +184,96 @@ def generate_sample_data():
             if response.status_code == 200:
                 generated_count += 1
             
-            # Generate customer event (30% chance)
-            if random.random() < 0.3:
+            # Generate customer event (20% chance)
+            if random.random() < 0.2:
                 customer = {
                     'event_type': 'customer_create',
                     'customer_id': customer_id,
-                    'name': f'Customer {customer_id}',
-                    'email': f'customer{customer_id}@example.com',
-                    'customer_segment': random.choice(['Bronze', 'Silver', 'Gold', 'Platinum']),
+                    'name': f"{first_name} {last_name}",
+                    'email': f"{first_name.lower()}.{last_name.lower()}{random.randint(1, 99)}@example.com",
+                    'customer_segment': random.choices(
+                        ['Bronze', 'Silver', 'Gold', 'Platinum'],
+                        weights=[0.5, 0.3, 0.15, 0.05]
+                    )[0],
                     'event_timestamp': datetime.now().isoformat()
                 }
                 response = requests.post(f"{SERVER_URL}/produce/ecommerce_customers", json={'value': customer})
                 if response.status_code == 200:
                     generated_count += 1
             
-            # Generate order items (1-3 per order)
-            num_items = random.randint(1, 3)
+            # Generate order items (1-5 per order)
+            num_items = random.randint(1, 5)
+            remaining_amount = total_amount
+            
             for j in range(num_items):
+                # Select random product category and name
+                category = random.choice(list(product_categories.keys()))
+                product_type = random.choice(product_categories[category])
+                
+                # Generate realistic product name
+                adjectives = ['Premium', 'Modern', 'Wireless', 'Smart', 'Durable']
+                if random.random() < 0.3:
+                    product_name = f"{random.choice(adjectives)} {product_type}"
+                else:
+                    product_name = product_type
+                
+                # Calculate item price
+                if j == num_items - 1:
+                    # Last item takes remaining amount
+                    item_total = remaining_amount
+                    quantity = max(1, int(item_total / random.uniform(10, 100)))
+                    unit_price = round(item_total / quantity, 2)
+                else:
+                    # Random portion of remaining amount
+                    max_portion = remaining_amount * 0.8
+                    item_total = round(random.uniform(10, min(max_portion, 500)), 2)
+                    quantity = random.randint(1, 3)
+                    unit_price = round(item_total / quantity, 2)
+                    remaining_amount -= item_total
+                
                 item = {
                     'event_type': 'order_item',
                     'event_timestamp': datetime.now().isoformat(),
-                    'item_id': (i * 10) + j,
-                    'order_id': order_id,
-                    'product_name': f'Product {random.randint(1, 50)}',
-                    'category': random.choice(['Electronics', 'Clothing', 'Books', 'Home']),
-                    'quantity': random.randint(1, 3),
-                    'unit_price': round(total_amount / (num_items * 2), 2),
-                    'total_price': round(total_amount / num_items, 2)
+                    'item_id': 3000 + generated_count * 50 + i * 5 + j,
+                    'order_id': order['order_id'],
+                    'product_name': product_name,
+                    'category': category,
+                    'quantity': quantity,
+                    'unit_price': unit_price,
+                    'total_price': round(unit_price * quantity, 2)
                 }
                 response = requests.post(f"{SERVER_URL}/produce/ecommerce_order_items", json={'value': item})
                 if response.status_code == 200:
                     generated_count += 1
             
-            # Generate fraud alert (15% chance)
-            if random.random() < 0.15 or total_amount > 2000:
-                fraud_score = 3 if total_amount > 2000 else 2
+            # Generate fraud alert (15% chance for any order, higher for high-value)
+            fraud_chance = 0.15
+            if order['total_amount'] > 2000:
+                fraud_chance = 0.4
+            elif order['total_amount'] > 5000:
+                fraud_chance = 0.7
+            
+            if random.random() < fraud_chance:
+                fraud_score = min(5, max(3, int(order['total_amount'] / 1000)))
+                fraud_reasons = []
+                if order['total_amount'] > 5000:
+                    fraud_reasons.append('High transaction amount')
+                if order['status'] in ['cancelled', 'refunded']:
+                    fraud_reasons.append('Suspicious order status')
+                if random.random() < 0.1:
+                    fraud_reasons.append('Unusual purchasing pattern')
+                
                 alert = {
                     'event_type': 'fraud_alert',
                     'event_timestamp': datetime.now().isoformat(),
-                    'alert_id': f'FRAUD_{order_id}',
-                    'order_id': order_id,
-                    'customer_id': customer_id,
+                    'alert_id': f'FRAUD_{order["order_id"]}_{int(time.time())}',
+                    'order_id': order['order_id'],
+                    'customer_id': order['customer_id'],
                     'fraud_score': fraud_score,
                     'risk_level': 'HIGH' if fraud_score >= 4 else 'MEDIUM',
-                    'reasons': ['High transaction amount'] if total_amount > 2000 else ['Suspicious pattern'],
-                    'total_amount': total_amount,
+                    'reasons': fraud_reasons if fraud_reasons else ['Suspicious pattern'],
+                    'total_amount': order['total_amount'],
+                    'status': order['status'],
                     'requires_review': fraud_score >= 4
                 }
                 response = requests.post(f"{SERVER_URL}/produce/ecommerce_fraud_alerts", json={'value': alert})
@@ -170,44 +303,56 @@ def get_simple_kafka_status():
     
     # Return demo data if in demo mode
     if hasattr(st, 'session_state') and st.session_state.get('demo_mode', False):
+        # Get generation count to generate dynamic message counts
+        generation_count = st.session_state.get('data_generation_count', 0)
+        
+        # Calculate dynamic message counts based on generation count
+        # Base message counts with generation multiplier
+        base_orders = 156 + (generation_count * 20)
+        base_customers = 42 + (generation_count * 5)
+        base_order_items = 312 + (generation_count * 40)
+        base_fraud_alerts = 23 + (generation_count * 3)
+        
+        total_messages = base_orders + base_customers + base_order_items + base_fraud_alerts
+        
         return {
             'server_running': True,
             'topics': {
                 'ecommerce_orders': {
                     'partition_count': 3,
-                    'total_messages': 156,
+                    'total_messages': base_orders,
                     'partitions': {
-                        0: {'messages': 52, 'latest_offset': 51},
-                        1: {'messages': 52, 'latest_offset': 51},
-                        2: {'messages': 52, 'latest_offset': 51}
+                        0: {'messages': base_orders // 3, 'latest_offset': (base_orders // 3) - 1},
+                        1: {'messages': base_orders // 3, 'latest_offset': (base_orders // 3) - 1},
+                        2: {'messages': base_orders - (2 * (base_orders // 3)), 'latest_offset': (base_orders - (2 * (base_orders // 3))) - 1}
                     }
                 },
                 'ecommerce_customers': {
                     'partition_count': 2,
-                    'total_messages': 42,
+                    'total_messages': base_customers,
                     'partitions': {
-                        0: {'messages': 21, 'latest_offset': 20},
-                        1: {'messages': 21, 'latest_offset': 20}
+                        0: {'messages': base_customers // 2, 'latest_offset': (base_customers // 2) - 1},
+                        1: {'messages': base_customers - (base_customers // 2), 'latest_offset': (base_customers - (base_customers // 2)) - 1}
                     }
                 },
                 'ecommerce_order_items': {
                     'partition_count': 3,
-                    'total_messages': 312,
+                    'total_messages': base_order_items,
                     'partitions': {
-                        0: {'messages': 104, 'latest_offset': 103},
-                        1: {'messages': 104, 'latest_offset': 103},
-                        2: {'messages': 104, 'latest_offset': 103}
+                        0: {'messages': base_order_items // 3, 'latest_offset': (base_order_items // 3) - 1},
+                        1: {'messages': base_order_items // 3, 'latest_offset': (base_order_items // 3) - 1},
+                        2: {'messages': base_order_items - (2 * (base_order_items // 3)), 'latest_offset': (base_order_items - (2 * (base_order_items // 3))) - 1}
                     }
                 },
                 'ecommerce_fraud_alerts': {
                     'partition_count': 1,
-                    'total_messages': 23,
+                    'total_messages': base_fraud_alerts,
                     'partitions': {
-                        0: {'messages': 23, 'latest_offset': 22}
+                        0: {'messages': base_fraud_alerts, 'latest_offset': base_fraud_alerts - 1}
                     }
                 }
             },
-            'total_messages': 533
+            'total_messages': total_messages
         }
     
     # Check server status using REST API directly for better reliability
@@ -243,11 +388,51 @@ def get_simple_kafka_status():
 def load_simple_kafka_messages(topic: str, limit: int = 1000) -> Optional[pd.DataFrame]:
     """Load recent messages from Simple Kafka topic or generate demo data."""
     
+    # Import necessary modules inside function to avoid Streamlit import issues
+    import random
+    from datetime import datetime, timedelta
+    
     # Generate demo data if in demo mode
     if hasattr(st, 'session_state') and st.session_state.get('demo_mode', False):
-        import random
-        from datetime import datetime, timedelta
-        import pandas as pd
+        
+        # Use data generation count to seed randomness for consistent new data each time
+        generation_count = st.session_state.get('data_generation_count', 0)
+        
+        # Apply random seed with generation count to ensure different data each time
+        # Also use a unique seed for each topic to ensure topic-specific randomness
+        topic_seed = hash(f"{generation_count}_{topic}") % (2**32)
+        random.seed(topic_seed)
+        
+        # Enhanced realistic data generation
+        
+        # Realistic first and last names for customers
+        first_names = ['John', 'Jane', 'Michael', 'Sarah', 'David', 'Emma', 'James', 'Olivia',
+                      'Robert', 'Ava', 'William', 'Sophia', 'Joseph', 'Isabella', 'Thomas', 'Mia',
+                      'Charles', 'Charlotte', 'Daniel', 'Amelia', 'Matthew', 'Harper', 'Anthony', 'Evelyn',
+                      'Donald', 'Abigail', 'Mark', 'Emily', 'Paul', 'Elizabeth', 'Andrew', 'Sofia',
+                      'Joshua', 'Avery', 'Kevin', 'Ella', 'Brian', 'Scarlett', 'George', 'Grace',
+                      'Edward', 'Chloe', 'Ryan', 'Victoria', 'Jason', 'Riley', 'Jeff', 'Lily',
+                      'Gary', 'Madison', 'Kevin', 'Eleanor', 'Tim', 'Hannah', 'Steve', 'Layla']
+        
+        last_names = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis',
+                     'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas',
+                     'Taylor', 'Moore', 'Jackson', 'Martin', 'Lee', 'Perez', 'Thompson', 'White',
+                     'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson', 'Walker', 'Young',
+                     'Allen', 'King', 'Wright', 'Scott', 'Torres', 'Nguyen', 'Hill', 'Flores',
+                     'Green', 'Adams', 'Nelson', 'Baker', 'Hall', 'Rivera', 'Campbell', 'Mitchell',
+                     'Carter', 'Roberts', 'Gomez', 'Phillips', 'Evans', 'Turner', 'Diaz', 'Parker']
+        
+        # Realistic product categories and names
+        product_categories = {
+            'Electronics': ['Smartphone', 'Laptop', 'Tablet', 'Headphones', 'Smart Watch', 'Camera',
+                           'Bluetooth Speaker', 'Gaming Console', 'Monitor', 'Keyboard', 'Mouse', 'Printer'],
+            'Clothing': ['T-Shirt', 'Jeans', 'Sweater', 'Jacket', 'Dress', 'Shirt', 'Pants', 'Shorts',
+                        'Skirt', 'Blouse', 'Socks', 'Shoes'],
+            'Books': ['Novel', 'Biography', 'Self-Help', 'Cookbook', 'Textbook', 'Science Fiction',
+                     'Mystery', 'Romance', 'History', 'Childrens Book', 'Poetry', 'Business'],
+            'Home': ['Furniture', 'Kitchenware', 'Bedding', 'Decor', 'Cleaning Supplies', 'Tools',
+                    'Appliances', 'Gardening', 'Storage', 'Lighting', 'Bathroom', 'Outdoor']
+        }
         
         # Generate synthetic data based on topic
         if topic == 'ecommerce_orders':
@@ -255,23 +440,60 @@ def load_simple_kafka_messages(topic: str, limit: int = 1000) -> Optional[pd.Dat
             orders = []
             now = datetime.now()
             
-            for i in range(50):
-                order_date = now - timedelta(minutes=random.randint(0, 120))
-                total_amount = round(random.uniform(25.99, 1999.99), 2)
+            # Generate more orders with realistic IDs
+            for i in range(100):
+                # Vary the time distribution (more recent orders are more frequent)
+                if i < 20:
+                    # Most recent 20 orders (last 30 minutes)
+                    order_date = now - timedelta(minutes=random.randint(0, 30))
+                elif i < 50:
+                    # Next 30 orders (30 min to 2 hours)
+                    order_date = now - timedelta(minutes=random.randint(30, 120))
+                else:
+                    # Older orders (2 hours to 24 hours)
+                    order_date = now - timedelta(minutes=random.randint(120, 1440))
                 
-                # Occasionally generate high-value orders
-                if random.random() < 0.1:
-                    total_amount = round(random.uniform(2000, 8000), 2)
+                # Realistic price ranges with occasional outliers
+                price_ranges = [
+                    (10.99, 49.99, 0.5),   # 50% of orders are under $50
+                    (50.00, 199.99, 0.3),  # 30% between $50-$200
+                    (200.00, 499.99, 0.15), # 15% between $200-$500
+                    (500.00, 1999.99, 0.04), # 4% between $500-$2000
+                    (2000.00, 8000.00, 0.01) # 1% over $2000 (potential fraud)
+                ]
+                
+                # Choose price range based on weights
+                price_range = random.choices(
+                    [r[0:2] for r in price_ranges], 
+                    weights=[r[2] for r in price_ranges]
+                )[0]
+                total_amount = round(random.uniform(*price_range), 2)
+                
+                # Generate realistic order ID (random 9-digit number)
+                order_id = random.randint(100000000, 999999999)
+                
+                # Customer ID (random 6-digit number)
+                customer_id = random.randint(100000, 999999)
+                
+                # Realistic payment methods with proper distribution
+                payment_methods = ['credit_card', 'debit_card', 'paypal', 'bank_transfer', 'apple_pay', 'google_pay']
+                payment_weights = [0.4, 0.3, 0.15, 0.08, 0.04, 0.03]
+                payment_method = random.choices(payment_methods, weights=payment_weights)[0]
+                
+                # Realistic order status distribution
+                order_statuses = ['pending', 'processing', 'completed', 'cancelled', 'refunded']
+                status_weights = [0.15, 0.25, 0.5, 0.08, 0.02]
+                status = random.choices(order_statuses, weights=status_weights)[0]
                 
                 order = {
                     'event_type': 'order',
                     'event_timestamp': order_date.isoformat(),
-                    'order_id': 1000 + i,
-                    'customer_id': 101 + (i % 10),
+                    'order_id': order_id,
+                    'customer_id': customer_id,
                     'order_date': order_date.strftime('%Y-%m-%d'),
-                    'status': random.choice(['pending', 'processing', 'completed', 'cancelled']),
+                    'status': status,
                     'total_amount': total_amount,
-                    'payment_method': random.choice(['credit_card', 'debit_card', 'paypal']),
+                    'payment_method': payment_method,
                     'source_system': 'demo_data',
                     '_kafka_timestamp': order_date,
                     '_kafka_offset': i,
@@ -286,15 +508,49 @@ def load_simple_kafka_messages(topic: str, limit: int = 1000) -> Optional[pd.Dat
             customers = []
             now = datetime.now()
             
-            for i in range(10):
+            for i in range(50):
+                # Generate realistic customer ID
+                customer_id = random.randint(100000, 999999)
+                
+                # Generate realistic name
+                first_name = random.choice(first_names)
+                last_name = random.choice(last_names)
+                full_name = f"{first_name} {last_name}"
+                
+                # Generate realistic email
+                email = f"{first_name.lower()}.{last_name.lower()}{random.randint(1, 99)}@example.com"
+                
+                # Realistic customer segments with proper distribution
+                segments = ['Bronze', 'Silver', 'Gold', 'Platinum']
+                segment_weights = [0.5, 0.3, 0.15, 0.05]
+                customer_segment = random.choices(segments, weights=segment_weights)[0]
+                
+                # Event type distribution (more creates than updates)
+                event_types = ['customer_create', 'customer_update']
+                event_weights = [0.7, 0.3]
+                event_type = random.choices(event_types, weights=event_weights)[0]
+                
+                # Vary timestamp (newer customers are more frequent)
+                if i < 10:
+                    # Recent customers (last 3 days)
+                    event_date = now - timedelta(days=random.randint(0, 3))
+                elif i < 30:
+                    # 3-30 days
+                    event_date = now - timedelta(days=random.randint(3, 30))
+                else:
+                    # Older customers (30-365 days)
+                    event_date = now - timedelta(days=random.randint(30, 365))
+                
                 customer = {
-                    'event_type': 'customer_create',
-                    'event_timestamp': (now - timedelta(days=i)).isoformat(),
-                    'customer_id': 101 + i,
-                    'name': f'Customer {101 + i}',
-                    'email': f'customer{101 + i}@example.com',
-                    'customer_segment': random.choice(['Bronze', 'Silver', 'Gold', 'Platinum']),
-                    '_kafka_timestamp': now - timedelta(days=i),
+                    'event_type': event_type,
+                    'event_timestamp': event_date.isoformat(),
+                    'customer_id': customer_id,
+                    'name': full_name,
+                    'email': email,
+                    'customer_segment': customer_segment,
+                    'first_name': first_name,
+                    'last_name': last_name,
+                    '_kafka_timestamp': event_date,
                     '_kafka_offset': i,
                     '_kafka_partition': i % 2
                 }
@@ -307,19 +563,65 @@ def load_simple_kafka_messages(topic: str, limit: int = 1000) -> Optional[pd.Dat
             order_items = []
             now = datetime.now()
             
-            for i in range(100):
-                order_id = 1000 + (i // 2)  # 2 items per order on average
+            # Create a list of order IDs to reference
+            order_ids = [random.randint(100000000, 999999999) for _ in range(50)]
+            
+            for i in range(200):
+                # Get a random order ID
+                order_id = random.choice(order_ids)
+                
+                # Item ID (random 8-digit number)
+                item_id = random.randint(10000000, 99999999)
+                
+                # Random category
+                category = random.choice(list(product_categories.keys()))
+                
+                # Random product type from category
+                product_type = random.choice(product_categories[category])
+                
+                # Generate realistic product name
+                adjectives = ['Premium', 'Deluxe', 'Classic', 'Modern', 'Vintage', 'Organic',
+                            'Eco-Friendly', 'Smart', 'Wireless', 'Noise-Canceling', 'Waterproof', 'Durable']
+                if random.random() < 0.3:
+                    # Add an adjective to 30% of product names
+                    product_name = f"{random.choice(adjectives)} {product_type}"
+                else:
+                    product_name = product_type
+                
+                # Realistic quantities (most items are 1-3, occasional higher quantities)
+                if random.random() < 0.05:
+                    # 5% of items have higher quantities (4-10)
+                    quantity = random.randint(4, 10)
+                else:
+                    quantity = random.randint(1, 3)
+                
+                # Realistic unit prices based on category
+                category_prices = {
+                    'Electronics': (19.99, 999.99),
+                    'Clothing': (9.99, 199.99),
+                    'Books': (4.99, 49.99),
+                    'Home': (14.99, 499.99)
+                }
+                min_price, max_price = category_prices[category]
+                unit_price = round(random.uniform(min_price, max_price), 2)
+                
+                # Calculate total price
+                total_price = round(unit_price * quantity, 2)
+                
+                # Vary timestamp
+                item_date = now - timedelta(minutes=random.randint(0, 1440))
+                
                 order_items.append({
                     'event_type': 'order_item',
-                    'event_timestamp': (now - timedelta(minutes=i)).isoformat(),
-                    'item_id': 2000 + i,
+                    'event_timestamp': item_date.isoformat(),
+                    'item_id': item_id,
                     'order_id': order_id,
-                    'product_name': f'Product {random.randint(1, 50)}',
-                    'category': random.choice(['Electronics', 'Clothing', 'Books', 'Home']),
-                    'quantity': random.randint(1, 3),
-                    'unit_price': round(random.uniform(10.99, 499.99), 2),
-                    'total_price': round(random.uniform(10.99, 999.99), 2),
-                    '_kafka_timestamp': now - timedelta(minutes=i),
+                    'product_name': product_name,
+                    'category': category,
+                    'quantity': quantity,
+                    'unit_price': unit_price,
+                    'total_price': total_price,
+                    '_kafka_timestamp': item_date,
                     '_kafka_offset': i,
                     '_kafka_partition': i % 3
                 })
@@ -331,21 +633,58 @@ def load_simple_kafka_messages(topic: str, limit: int = 1000) -> Optional[pd.Dat
             fraud_alerts = []
             now = datetime.now()
             
-            for i in range(15):
-                order_id = 1000 + i
-                total_amount = round(random.uniform(3000, 8000), 2)
+            for i in range(25):
+                # Get a realistic order ID
+                order_id = random.randint(100000000, 999999999)
+                
+                # Customer ID
+                customer_id = random.randint(100000, 999999)
+                
+                # Generate realistic fraud reasons
+                fraud_reasons = [
+                    'High transaction amount',
+                    'Unusual purchasing pattern',
+                    'Multiple orders in short time',
+                    'Suspicious payment method',
+                    'High-risk location',
+                    'New customer with large order',
+                    'Suspicious IP address',
+                    'Failed payment attempts'
+                ]
+                
+                # Select 1-3 fraud reasons
+                num_reasons = random.randint(1, 3)
+                selected_reasons = random.sample(fraud_reasons, num_reasons)
+                
+                # Generate realistic total amount for fraud cases
+                total_amount = round(random.uniform(2000, 15000), 2)
+                
+                # Calculate fraud score based on amount and reasons
+                base_score = min(5, max(3, int(total_amount / 1000)))
+                reason_bonus = len(selected_reasons) - 1
+                fraud_score = min(5, base_score + reason_bonus)
+                
+                # Risk level based on score
+                risk_level = 'HIGH' if fraud_score >= 4 else 'MEDIUM'
+                
+                # Requires review if high risk
+                requires_review = fraud_score >= 4
+                
+                # Vary timestamp (spread over last 24 hours)
+                alert_date = now - timedelta(minutes=random.randint(0, 1440))
+                
                 fraud_alerts.append({
                     'event_type': 'fraud_alert',
-                    'event_timestamp': (now - timedelta(minutes=i*5)).isoformat(),
-                    'alert_id': f'FRAUD_{order_id}',
+                    'event_timestamp': alert_date.isoformat(),
+                    'alert_id': f'FRAUD_{order_id}_{int(time.time())}',
                     'order_id': order_id,
-                    'customer_id': 101 + (i % 10),
-                    'fraud_score': random.randint(3, 5),
-                    'risk_level': 'HIGH' if random.random() > 0.3 else 'MEDIUM',
-                    'reasons': ['High transaction amount', 'Unusual purchasing pattern'],
+                    'customer_id': customer_id,
+                    'fraud_score': fraud_score,
+                    'risk_level': risk_level,
+                    'reasons': selected_reasons,
                     'total_amount': total_amount,
-                    'requires_review': random.random() > 0.5,
-                    '_kafka_timestamp': now - timedelta(minutes=i*5),
+                    'requires_review': requires_review,
+                    '_kafka_timestamp': alert_date,
                     '_kafka_offset': i,
                     '_kafka_partition': 0
                 })
@@ -502,18 +841,19 @@ def create_simple_kafka_status_section():
         if 'error' in status:
             st.info(f"Error: {status['error']}")
         
-        # Try to initialize server - this will only work if the module is available locally
+        # Try to initialize integrated server
         if st.button("🚀 Initialize Simple Kafka Server"):
             try:
-                # Only attempt this if we can import the server module
-                from src.streaming.simple.server import start_simple_kafka_server
-                start_simple_kafka_server()
-                st.success("✅ Server initialized!")
-                st.rerun()
-            except ImportError:
-                st.error("Cannot initialize server: Simple Kafka module not available")
+                with st.spinner("Starting Kafka server..."):
+                    if start_kafka_server_in_background():
+                        st.success("✅ Server initialized successfully!")
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ Server already initialized")
             except Exception as e:
                 st.error(f"Failed to initialize server: {e}")
+                import traceback
+                st.code(traceback.format_exc())
         
         return
     
@@ -538,8 +878,8 @@ def create_simple_kafka_status_section():
         st.metric("Active Topics", active_topics)
     
     with col4:
-        st.info("ℹ️ Development Mode")
-        st.write("In-Memory Only")
+        st.info("ℹ️ Integrated Mode")
+        st.write("Kafka Server Embedded")
     
     # Generate sample data if no messages
     if status.get('total_messages', 0) == 0:
@@ -1041,6 +1381,10 @@ def main():
     if 'demo_mode' not in st.session_state:
         st.session_state.demo_mode = True  # Default to demo mode for online deployment
     
+    # Initialize data generation counter
+    if 'data_generation_count' not in st.session_state:
+        st.session_state.data_generation_count = 0
+    
     st.title("⚡ Simple Kafka Real-Time Dashboard")
     st.markdown("""
     **Live Data Pipeline Dashboard** - Real-time analytics from Simple Kafka in-memory broker
@@ -1051,6 +1395,11 @@ def main():
     - **Fraud Detection** - Suspicious pattern identification
     - **Order Stream** - Recent orders with filtering capabilities
     """)
+    
+    # Start Kafka server automatically when not in demo mode
+    if not st.session_state.demo_mode:
+        with st.spinner("Initializing Simple Kafka Server..."):
+            start_kafka_server_in_background()
     
     # Sidebar settings with demo mode toggle
     st.sidebar.header("⚙️ Dashboard Settings")
