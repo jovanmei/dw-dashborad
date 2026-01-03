@@ -1495,7 +1495,8 @@ def main():
             st.write("1. Switch to Demo Mode - Use the toggle in settings to enable sample data")
             st.write("2. For local development: Run `python scripts/run_streaming_simple.py`")
             st.write(f"Debug info: Server URL - http://localhost:5051, Error - {str(e)}")
-            return
+            # Continue rendering the dashboard so user can switch to demo mode
+            st.info("You can still switch to demo mode using the toggle in the sidebar.")
     
     
     # Navigation tabs
